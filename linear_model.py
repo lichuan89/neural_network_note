@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 %matplotlib inline
 
-def collect_train_data():
+def collect_train_data_1x1y():
     """
     data: y = x * 2 + noise
     """
@@ -51,19 +51,20 @@ def get_params_grad(w, x, t):
     return x.T.dot(cost_deriv(predict(x, w), t))
 
 
-def grad_desc_train(x, t, init_w, iterations=8, learning_rate=0.05, cost_thre=0.4):
+def grad_desc_train(x, t, init_w, iterations=8, learning_rate=0.05):
     """
-    梯度下降训练
+    train. use gradient descent
     """
     w = init_w
-    w_cost = [(w, cost(predict(x, w), t))]
+    w_costs = [(w, cost(predict(x, w), t))]
     for i in range(iterations):
-        dw = learning_rate * get_params_grad(w, x, t)  
+        dw = learning_rate * get_params_grad(w, x, t)
         w = w - dw
-        w_cost.append((w, cost(predict(x, w), t)))  
-        if w_cost < cost_thre:
-            break
-    return (w, w_cost)
+        w_costs.append((w, cost(predict(x, w), t)))  
+        if len(w_costs) > 3:
+            if w_costs[-1][1] >= w_costs[-2][1] >= w_costs[-3][1]:
+                break
+    return (w, w_costs)
 
 
 def show_train_data_1x1y(x, y, predict=None, w=None):
@@ -104,7 +105,7 @@ def show_cost_space_1x1y(x, y, w_cost=None):
     plt.grid()
  
 def test():
-    x, t = collect_train_data()
+    x, t = collect_train_data_1x1y()
     
     show_train_data_1x1y(x, t, predict=None, w=None)
     plt.show() 
@@ -112,7 +113,7 @@ def test():
     plt.show()
     
     
-    w, w_cost = train(x, t, 0.1)    
+    w, w_cost = grad_desc_train(x, t, 0.1)    
     
     show_train_data_1x1y(x, t, predict, w)
     plt.show()
@@ -120,5 +121,3 @@ def test():
     plt.show()
     
 test()
-
- 
