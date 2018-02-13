@@ -58,8 +58,8 @@ def grad_desc_train(x, t, init_w, iterations=8, learning_rate=0.05):
     w = init_w
     w_costs = [(w, cost(predict(x, w), t))]
     for i in range(iterations):
-        dw = learning_rate * get_params_grad(w, x, t)
-        w = w - dw
+        delt_w = learning_rate * get_params_grad(w, x, t)
+        w = w - delt_w
         w_costs.append((w, cost(predict(x, w), t)))  
         if len(w_costs) > 3:
             if w_costs[-1][1] >= w_costs[-2][1] >= w_costs[-3][1]:
@@ -119,5 +119,6 @@ def test():
     plt.show()
     show_cost_space_1x1y(x, t, w_cost)
     plt.show()
-    
-test()
+
+if __name__ == "__main__":
+    test()
