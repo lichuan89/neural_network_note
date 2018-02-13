@@ -144,7 +144,7 @@ def test():
     show_cost_space_2x1y(x, t, w_iters=None)
     plt.show()  
 
-    w, w_cost = grad_desc_train(x, t, np.asmatrix([-4, -2]), iterations=10, learning_rate=0.05)
+    w, w_cost = grad_desc_train(x, t, np.asmatrix([-4, -2]), iterations=6, learning_rate=0.05)
     show_cost_space_2x1y(x, t, w_iters=w_cost)
     plt.show()  
     show_2_dim_2_label_space(x, t, predict=predict, w=w) 
