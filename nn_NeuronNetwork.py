@@ -199,6 +199,7 @@ class NeuronNetwork(object):
             training_costs.append(cost)
             cost = self.train_once(X_validation, T_validation, learning_rate=None)
             validation_costs.append(cost)
+            print cost
             if len(validation_costs) > 3:
                 if validation_costs[-1] >= validation_costs[-2] >= validation_costs[-3]:
                     break
@@ -266,22 +267,19 @@ def collect_train_data():
     return X_train, T_train, X_validation, T_validation, X_test, T_test
 
 
-def test():  
-
-    # 准备数据集：训练, 校验, 测试 
-    X_train, T_train, X_validation, T_validation, X_test, T_test = collect_train_data()
+def small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, num1=20, num2=20):
 
     # 构建神经网络
     nn = NeuronNetwork(
             X_train.shape[1], 
-            [20, 20, T_train.shape[1]],
+            [num1, num2, T_train.shape[1]],
             [LogisticLayer, LogisticLayer, SoftmaxLayer],
             crossEntropy_cost,
             crossEntropy_cost_deriv 
         )
 
     # 训练
-    train_method = 'random_grad_desc'
+    train_method = 'grad_desc'
     if train_method == 'random_grad_desc':
         (cost, terations, costs_vec) = nn.train_random_grad_desc(
                 X_train,
@@ -295,7 +293,6 @@ def test():
         minibatch_costs, training_costs, validation_costs = costs_vec
         arrs = (minibatch_costs, training_costs, validation_costs)
         labels = ('cost minibatches', 'cost training set', 'cost validation set')
-        show_array(arrs, labels, title='Decrease of cost over backprop iteration')
     elif train_method == 'grad_desc':
         (cost, terations, costs_vec) = nn.train_grad_desc(
                 X_train,
@@ -308,8 +305,7 @@ def test():
         training_costs, validation_costs = costs_vec
         arrs = (training_costs, validation_costs)
         labels = ('cost full training set', 'cost validation set')
-        show_array(arrs, labels, title='Decrease of cost over backprop iteration')
-        
+    show_array(arrs, labels, title='Decrease of cost over backprop iteration')
     # 评估准确率 
     test_accuracy = nn.test_accuracy(X_test, T_test)
     print 'test_accuracy:', test_accuracy   
@@ -321,5 +317,8 @@ def test():
     y_pred = np.argmax(y_test, axis=1)   
     show_predict_numbers(y_true, y_pred)    
 
+
 if __name__ == "__main__": 
-    test()
+    # 准备数据集：训练, 校验, 测试 
+    X_train, T_train, X_validation, T_validation, X_test, T_test = collect_train_data()
+    small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, 20, 20)
