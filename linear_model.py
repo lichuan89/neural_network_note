@@ -3,13 +3,13 @@
 """
     @author lichuan89@126.com
     @date   2016/09/12  
-    @note
+    @note 梯度下降训练线性模型
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-%matplotlib inline
+#%matplotlib inline
 
 def collect_train_data_1x1y():
     """

@@ -8,6 +8,7 @@
 
 import numpy as np
 import itertools
+import sys
 import collections
 from sklearn import metrics
 from nn_activation import logistic
@@ -92,8 +93,6 @@ class SoftmaxLayer(Layer):
         return np.multiply(softmax_deriv(Y), output_grad)
     
 
-
-    
 def forward_step(input_samples, layers):
     """
     前向传播，取输入和每一层输出
@@ -101,9 +100,9 @@ def forward_step(input_samples, layers):
     activations = [input_samples] 
     X = input_samples
     for layer in layers:
-        Y = layer.get_output(X)   
+        Y = layer.get_output(X)  
         activations.append(Y)   
-        X = activations[-1]   
+        X = activations[-1]  
     return activations  
 
  
@@ -115,10 +114,16 @@ def backward_step(activations, targets, layers, cost_grad_func):
     param_grads = collections.deque()  
     output_grad = None
     for layer in reversed(layers):   
-        Y = activations.pop() 
-        if output_grad is None:
-            output_grad = crossEntropy_cost_deriv(Y, targets)  
-        input_grad = layer.get_input_grad(Y, output_grad)
+        Y = activations.pop()
+        # 交叉熵损失函数, 合并链式梯度公式 
+        if output_grad is None \
+                and cost_grad_func == crossEntropy_cost_deriv \
+                and type(layer) == SoftmaxLayer:
+            input_grad = (Y - targets) / Y.shape[0]
+        else:
+            if output_grad is None:
+                output_grad = cost_grad_func(Y, targets)  
+            input_grad = layer.get_input_grad(Y, output_grad)
 
         X = activations[-1]
         grads = layer.get_params_grad(X, output_grad)
@@ -159,8 +164,8 @@ class NeuronNetwork(object):
     
  
     def train_once(self, X, T, learning_rate):
-        activations = forward_step(X, self.layers) 
-        cost = self.cost_func(activations[-1], T) 
+        activations = forward_step(X, self.layers)
+        cost = self.cost_func(activations[-1], T)
         if learning_rate is None: 
             return cost
         param_grads = backward_step(activations, T, self.layers, self.cost_grad_func)   
@@ -195,11 +200,13 @@ class NeuronNetwork(object):
             for X, T in XT_batches:  # For each minibatch sub-iteration
                 cost = self.train_once(X, T, learning_rate)
                 minibatch_costs.append(cost)
+                print >> sys.stderr, 'train: minibatch train cost is %f' % cost
             cost = self.train_once(X_train, T_train, learning_rate=None)
+            print >> sys.stderr, 'train: train cost is %f' % cost
             training_costs.append(cost)
             cost = self.train_once(X_validation, T_validation, learning_rate=None)
+            print >> sys.stderr, 'train: validation cost is %f' % cost
             validation_costs.append(cost)
-            print cost
             if len(validation_costs) > 3:
                 if validation_costs[-1] >= validation_costs[-2] >= validation_costs[-3]:
                     break
@@ -222,9 +229,11 @@ class NeuronNetwork(object):
 
         for iteration in range(max_nb_of_iterations):
             cost = self.train_once(X_train, T_train, learning_rate)
+            print >> sys.stderr, 'train: train cost is %f' % cost
             training_costs.append(cost)
             cost = self.train_once(X_validation, T_validation, learning_rate=None)
             validation_costs.append(cost)
+            print >> sys.stderr, 'train: validation cost is %f' % cost
             if len(validation_costs) > 3:
                 if validation_costs[-1] >= validation_costs[-2] >= validation_costs[-3]:
                     break
@@ -232,9 +241,6 @@ class NeuronNetwork(object):
         nb_of_iterations = iteration + 1
         costs_vec = [training_costs, validation_costs]
         return (validation_costs[-1], nb_of_iterations, costs_vec)
-
-
-
 
 
 def collect_train_data():

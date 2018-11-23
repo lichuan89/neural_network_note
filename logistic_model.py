@@ -3,7 +3,7 @@
 """
     @author lichuan89@126.com
     @date   2016/09/12  
-    @note
+    @note 梯度下降训练LR模型
 """
 
 import numpy as np 
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter, ListedColormap
 from matplotlib import cm
 
-%matplotlib inline
+#%matplotlib inline
 
 
 def collect_train_data_2x1y():

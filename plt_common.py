@@ -18,6 +18,20 @@ def show_images(images, is_show=True):
     if is_show:
         plt.show()
 
+
+def show_2d_images(images, is_show=True):
+    cols = 10 
+    rows = len(images) / cols + 1
+    fig = plt.figure(figsize=(cols, rows), dpi=100)
+
+    for i in range(len(images)):
+        ax = fig.add_subplot(rows, cols, i + 1)
+        ax.matshow(images[i], cmap='binary') 
+        ax.axis('off')
+    if is_show:
+        plt.show()
+
+
 def show_array(arrs, labels, title='show array', is_show=True):
     colors = ['r-', 'k-', 'b-']
     colors = (colors * (len(arrs) / len(colors) + 1))[:len(arrs)]
@@ -71,7 +85,13 @@ def show_predict_numbers(y_true, y_pred, is_show=True):
     for x in xrange(conf_matrix.shape[0]):
         for y in xrange(conf_matrix.shape[1]):
             color = 'w' if x == y else 'k'
-            ax.text(x, y, conf_matrix[y,x], ha="center", va="center", color=color) 
+            color = 'r'
+            ax.text(x, y, conf_matrix[y,x], ha="center", va="center", color=color)
+             
 
     if is_show:
         plt.show()
+
+if __name__ == "__main__": 
+    #show_array(arrs=[(12.0, 1.5, 1.0, 0.3), (12.1, 1.6, 0.9, 0.1)], labels=['one', 'two'], title='show array', is_show=True)
+    show_predict_numbers(np.array([1, 0, 1, 1]), np.array([1, 1, 1, 1]), is_show=True)
