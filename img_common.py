@@ -64,8 +64,8 @@ def rgb_2_feature(image, gray_size=(50, 50), hist_size=(100, 100), rgb_hist_dim=
     参数如果是False,表示不用这个特征
     """ 
     vec = np.ones((1, 0))
-    fea_img = rgb_resize(image, hist_size)
-    gray_img = rgb_2_gray(fea_img)
+    if rgb_hist_dim != False or gray_hist != False:
+        fea_img = rgb_resize(image, hist_size)
     # rgb直方图
     if rgb_hist_dim != False:
         rgb_hist = rgb_2_hist(fea_img, l=rgb_hist_dim)
@@ -74,6 +74,7 @@ def rgb_2_feature(image, gray_size=(50, 50), hist_size=(100, 100), rgb_hist_dim=
 
     # 灰度直方图
     if gray_hist != False: 
+        gray_img = rgb_2_gray(fea_img)
         gray_hist = gray_2_hist(gray_img)
     else:
         gray_hist = np.ones((1, 0))
@@ -88,26 +89,6 @@ def rgb_2_feature(image, gray_size=(50, 50), hist_size=(100, 100), rgb_hist_dim=
     return vec
    
  
-def collect_basic_image_feature(img, use_hist=False, size=(50, 50)):
-    if use_hist:
-        rgb_hist = collect_rgb_hist(img, l=16)
-    img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
-    print 'resize:', img
-    img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    print 'gray:',img
-    matrix = np.zeros(size)
-    rows, cols = img.shape
-    for r in range(rows):
-        for c in range(cols):
-            g = img.item(r,c) 
-            matrix[c, r] = g
-    
-    vec = matrix.reshape(1, rows * cols)
-    if use_hist:
-        vec = np.hstack((rgb_hist, vec))
-    return vec
-
-
 def test():
     image = np.array( # 2行3列的RGB图像
         [

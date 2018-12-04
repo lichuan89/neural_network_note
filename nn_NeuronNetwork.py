@@ -11,7 +11,6 @@ import numpy as np
 import itertools
 import sys
 import collections
-from sklearn import metrics
 from common import str_2_json, json_2_str, file_2_str, str_2_file 
 from nn_activation import logistic
 from nn_activation import logistic_deriv
@@ -19,7 +18,6 @@ from nn_activation import softmax
 from nn_activation import softmax_deriv
 from nn_activation import crossEntropy_cost
 from nn_activation import crossEntropy_cost_deriv 
-from plt_common import show_images, show_array, show_predict_numbers  
 
 
 g_open_debug = False 
@@ -203,6 +201,7 @@ class NeuronNetwork(object):
         return json_2_str(obj)
  
     def test_accuracy(self, X_test, T_test):
+        from sklearn import metrics
         y_test = self.predict(X_test)
         y_true = np.argmax(T_test, axis=1) 
         y_pred = np.argmax(y_test, axis=1)   
@@ -288,6 +287,7 @@ class NeuronNetwork(object):
             validation_costs.append(cost)
             print >> sys.stderr, 'train: validation cost is %f' % cost
             i += 1
+    
             if len(validation_costs) > 3:
                 if validation_costs[-1] >= validation_costs[-2] >= validation_costs[-3]:
                     break
@@ -301,6 +301,7 @@ def collect_train_data():
     # 返回数字图片的dict, images字段:图片数组，target字段：图片上的数字数组
     # 1797张8*8图片
     from sklearn import datasets, cross_validation, metrics
+    from plt_common import show_images, show_array, show_predict_numbers  
     digits = datasets.load_digits()
     
     
@@ -328,6 +329,7 @@ def collect_train_data():
 
 
 def small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, num1=20, num2=20, save_file=None):
+    from plt_common import show_images, show_array, show_predict_numbers  
 
     # 构建神经网络
     nn = NeuronNetwork(
@@ -379,6 +381,7 @@ def small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, nu
         str_2_file(nn.to_string(), save_file)
 
 def small_test(load_file, X_test, T_test=None):
+    from plt_common import show_images, show_array, show_predict_numbers  
     s = file_2_str(load_file)
     nn = NeuronNetwork(create_string=s)
     # 预测

@@ -65,38 +65,39 @@ def str_2_file(string, fpath):
 def muti_process_stdin(worker, args, batch_line_num, thread_running_num):
     """
     多进程处理标准输入流, 批处理，并输出到标准输出流
-    每一批开启的进程数:thread_running_num, 单进程处理行数:batch_line_num
+    每一批处理batch_line_num行数据，每一批开启thread_running_num个线程 
     worker格式如:
     def worker(lines, args): return ['%s:%s' % (args[0], line) for line in lines]
     """
 
     idx = 0 
-    batch_arr = {}
+    batch = []
     for line in sys.stdin:
         line = line[: -1].decode('utf8', 'ignore')
-        if idx not in batch_arr:
-            batch_arr[idx] = []
-        if len(batch_arr[idx]) >= batch_line_num:
-            idx += 1
-            batch_arr[idx] = []
-        batch_arr[idx].append(line)
-        if idx >= thread_running_num - 1 and len(batch_arr[idx]) >= batch_line_num:
-            lines = muti_process(batch_arr, worker, args)
-            print '\n'.join(lines).encode('utf8', 'ignore')
+        batch.append(line)
+        if len(batch) >= batch_line_num:
+            output_lines = muti_process(batch, thread_running_num, worker, args)
+            print '\n'.join(output_lines).encode('utf8', 'ignore')
             sys.stdout.flush()
-            idx = 0 
-            batch_arr = {}
-    if batch_arr != {}:
-        muti_process(batch_arr, worker, args)
+            batch = []
+    if batch != []:
+        output_lines = muti_process(batch, thread_running_num, worker, args)
+        print '\n'.join(output_lines).encode('utf8', 'ignore')
 
 
-def muti_process(batch_arr, worker, args): 
+def muti_process(lines, thread_running_num, worker, args): 
     """ 
     多进程处理数据, 并输出 
     """
     manager = multiprocessing.Manager()
     contexts = manager.dict()
     threadpool = []
+    batch_arr = {}
+    for i in range(len(lines)):
+        k = i % thread_running_num 
+        batch_arr.setdefault(k, [])
+        batch_arr[k].append(lines[i])
+    
     for idx in batch_arr:
         th = Processor(worker, batch_arr[idx], args + [contexts])
         threadpool.append(th)
@@ -109,7 +110,7 @@ def muti_process(batch_arr, worker, args):
         th.join()
 
     lines = []
-    for k, v in contexts.items(): 
+    for k, v in contexts.items():
         for line in v:
             lines.append(line)
     return lines
@@ -134,10 +135,9 @@ class Processor(multiprocessing.Process):
         id = os.getpid() 
         self.share.setdefault(id, result)
 
-
 def test():
-    def worker(lines, args): return ['%s:%s' % (args[0], line) for line in lines]
-    muti_process_stdin(worker, ['prefix'], batch_line_num=2, thread_running_num=2)
+    def worker(lines, args): return ['%s:%d:%s' % (args[0], os.getpid(), line) for line in lines]
+    muti_process_stdin(worker, ['prefix'], batch_line_num=30, thread_running_num=7)
 
 
 if __name__ == "__main__":
