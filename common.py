@@ -46,51 +46,86 @@ def json_2_str(obj):
         return None 
 
 
-def file_2_str(fpath):
+def file_2_str(fpath, decode=None):
     """
     从文件读取字符串
     """
     with open(fpath, 'rb') as f:
-        return f.read()
+        context = f.read()
+        if decode is not None:
+            context = context.decode(decode, 'ignore')
+        return context
 
-
-def str_2_file(string, fpath):
+def str_2_file(string, fpath, encode=None):
     """
     将字符串写入文件
     """
     with open(fpath, 'wb') as f:
+        if encode is not None:
+            string = string.encode(encode, 'ignore')
         f.write(string)
 
 
-def muti_process_stdin(worker, args, batch_line_num, thread_running_num):
+def clear_dir(path):
+    """
+    创建文件夹,或者删除文件夹下的直接子文件
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+    else:
+        arr = os.listdir(path)
+        for v in arr:
+            f = '%s/%s' % (path, v) 
+            if os.path.isfile(f):
+                os.remove(f)
+
+def read_dir(path, decode='utf8'):
+    arr = os.listdir(path)
+    output = []
+    for v in arr:
+        f = '%s/%s' % (path, v)
+        if os.path.isfile(f):
+            context = file_2_str(f)
+            if decode is not None:
+                context = context.decode(decode, 'ignore')
+            output.append(context)
+    return output 
+
+
+def muti_process_stdin(worker, args, batch_line_num, thread_running_num, use_share_path=None):
     """
     多进程处理标准输入流, 批处理，并输出到标准输出流
     每一批处理batch_line_num行数据，每一批开启thread_running_num个线程 
     worker格式如:
     def worker(lines, args): return ['%s:%s' % (args[0], line) for line in lines]
     """
-
     idx = 0 
     batch = []
     for line in sys.stdin:
         line = line[: -1].decode('utf8', 'ignore')
         batch.append(line)
         if len(batch) >= batch_line_num:
-            output_lines = muti_process(batch, thread_running_num, worker, args)
+            output_lines = muti_process(batch, thread_running_num, worker, args, use_share_path)
             print '\n'.join(output_lines).encode('utf8', 'ignore')
             sys.stdout.flush()
             batch = []
     if batch != []:
-        output_lines = muti_process(batch, thread_running_num, worker, args)
+        output_lines = muti_process(batch, thread_running_num, worker, args, use_share_path)
         print '\n'.join(output_lines).encode('utf8', 'ignore')
 
 
-def muti_process(lines, thread_running_num, worker, args): 
+def muti_process(lines, thread_running_num, worker, args, use_share_path=None): 
     """ 
     多进程处理数据, 并输出 
     """
-    manager = multiprocessing.Manager()
-    contexts = manager.dict()
+    if use_share_path is None:
+        # 使用共享内存
+        manager = multiprocessing.Manager()
+        contexts = manager.dict()
+    else:
+        # 先并发输入文件,再统一搜集输出
+        clear_dir(use_share_path)
+        contexts = use_share_path 
     threadpool = []
     batch_arr = {}
     for i in range(len(lines)):
@@ -110,9 +145,13 @@ def muti_process(lines, thread_running_num, worker, args):
         th.join()
 
     lines = []
-    for k, v in contexts.items():
-        for line in v:
-            lines.append(line)
+    if use_share_path is not None:
+        lines = read_dir(use_share_path)
+        clear_dir(use_share_path)
+    else: 
+        for k, v in contexts.items():
+            for line in v:
+                lines.append(line)
     return lines
 
 
@@ -132,12 +171,23 @@ class Processor(multiprocessing.Process):
         run 
         """
         result = self.worker(self.lines, self.args)
-        id = os.getpid() 
-        self.share.setdefault(id, result)
+        id = os.getpid()
+        if type(self.share) == unicode or type(self.share) == type(''):
+            # 用临时文件存储结果
+            str_2_file('\n'.join(result).encode('utf8', 'ignore'), '%s/tmp.%s' % (self.share, id))
+        else:
+            self.share.setdefault(id, result)
 
 def test():
-    def worker(lines, args): return ['%s:%d:%s' % (args[0], os.getpid(), line) for line in lines]
-    muti_process_stdin(worker, ['prefix'], batch_line_num=30, thread_running_num=7)
+    if False:
+        clear_dir('tmp.muti_process')
+        str_2_file('abcd\nefg', 'tmp.muti_process/1')
+        str_2_file('abcd\nefg', 'tmp.muti_process/2')
+        print read_dir('tmp.muti_process')
+        clear_dir('tmp.muti_process')
+    if True: 
+        def worker(lines, args): return ['%s:%d:%s' % (args[0], os.getpid(), line) for line in lines]
+        muti_process_stdin(worker, ['prefix'], batch_line_num=30, thread_running_num=7, use_share_path='tmp.muti_process/')
 
 
 if __name__ == "__main__":

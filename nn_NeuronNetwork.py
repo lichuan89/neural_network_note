@@ -9,6 +9,7 @@
 import base64
 import numpy as np
 import itertools
+import math
 import sys
 import collections
 from common import str_2_json, json_2_str, file_2_str, str_2_file 
@@ -16,6 +17,12 @@ from nn_activation import logistic
 from nn_activation import logistic_deriv
 from nn_activation import softmax
 from nn_activation import softmax_deriv
+from nn_activation import relu 
+from nn_activation import relu_deriv
+from nn_activation import tanh 
+from nn_activation import tanh_deriv 
+from nn_activation import arctan 
+from nn_activation import arctan_deriv 
 from nn_activation import crossEntropy_cost
 from nn_activation import crossEntropy_cost_deriv 
 
@@ -111,6 +118,18 @@ class SoftmaxLayer(Layer):
     def to_string(self):
         return 'SoftmaxLayer' 
 
+
+class ReluLayer(Layer):
+    def get_output(self, X):
+        return relu(X)
+    
+    def get_input_grad(self, Y, output_grad):
+        return np.multiply(relu_deriv(Y), output_grad)
+   
+    def to_string(self):
+        return 'Relu' 
+
+
 def forward_step(input_samples, layers):
     """
     前向传播，取输入和每一层输出
@@ -173,7 +192,7 @@ class NeuronNetwork(object):
         self.cost_grad_func = cost_grad_func
    
     def from_string(self, string):
-        classes = [SoftmaxLayer, LogisticLayer, crossEntropy_cost, crossEntropy_cost_deriv]
+        classes = [SoftmaxLayer, LogisticLayer, ReluLayer, crossEntropy_cost, crossEntropy_cost_deriv]
         classes = dict([active_func.__name__, active_func] for active_func in classes)
     
         self.layers = []
@@ -335,7 +354,8 @@ def small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, nu
     nn = NeuronNetwork(
             X_train.shape[1], 
             [num1, num2, T_train.shape[1]],
-            [LogisticLayer, LogisticLayer, SoftmaxLayer],
+            #[LogisticLayer, LogisticLayer, SoftmaxLayer],
+            [LogisticLayer, ReluLayer, SoftmaxLayer],
             crossEntropy_cost,
             crossEntropy_cost_deriv 
         )

@@ -58,7 +58,7 @@ def collect_train_data():
         np.savetxt('%s.val' % train_image_fpath, T, fmt="%d", delimiter=",")
 
     #data = data[:, 1600:]
-    data = data[:, :1600]
+    #data = data[:, :1600]
     X_train, T_train, X_validation, T_validation, X_test, T_test = split_data(data, T)
     return X_train, T_train, X_validation, T_validation, X_test, T_test 
 

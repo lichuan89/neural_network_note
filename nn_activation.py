@@ -10,7 +10,9 @@ import numpy as np
 import copy
 
 
-# 参考:https://blog.csdn.net/cckchina/article/details/79915181
+# 参考:
+#   https://blog.csdn.net/cckchina/article/details/79915181
+#   https://zhuanlan.zhihu.com/p/37740860
 
 def logistic(z):
     o = copy.deepcopy(z)
@@ -26,6 +28,32 @@ def softmax(z):
 
 def softmax_deriv(y):
     return np.multiply(y, (1 - y)) 
+
+
+def relu(z):
+    return np.maximum(z, 0)
+
+
+def relu_deriv(y):
+    o = np.ones(y.shape)
+    o[y < 0] = 0 
+    return o
+
+
+def tanh(z):
+    return np.tanh(z)
+
+
+def tanh_deriv(y):
+    return 1 - y ** 2
+
+
+def arctan(z):
+    return np.arctan(z)
+
+
+def arctan_deriv(z):
+    return 1 / (1 + z ** 2)
 
 def crossEntropy_cost(y, t): 
     """ 

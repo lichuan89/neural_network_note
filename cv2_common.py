@@ -146,7 +146,8 @@ def collect_image_fea(files, expend_num=10, use_fea='pixel'):
             imgs += [random_expend_image(image) for i in range(expend_num)]
 
         i = 0
-        print >> sys.stderr, 'begin to process %s' % fname 
+        if g_open_debug:
+            print >> sys.stderr, 'begin to process %s' % fname 
         for img in imgs:
             # 抽取特征
             if use_fea == 'pixel':
@@ -164,7 +165,8 @@ def collect_image_fea(files, expend_num=10, use_fea='pixel'):
             if g_open_debug:
                 cv2image_2_file(image_2_cv2image(img), 'output/%s.%d.jpg' % (idx, i))
             i += 1
-        print >> sys.stderr, 'finish to process %s' % fname 
+        if g_open_debug:
+            print >> sys.stderr, 'finish to process %s' % fname 
     if g_open_debug:
         plt_common.show_2d_images(mats[0: 50])
     return data, T 
