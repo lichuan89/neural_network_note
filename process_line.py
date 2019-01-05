@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
-    @author lichuan01@baidu.com
+    @author lichuan89@126.com
     @date   2016/09/12  
     @note   
 """
