@@ -23,6 +23,32 @@ import multiprocessing
 import fcntl 
 
 
+g_open_log = True 
+g_current_time = None
+
+def log(*arg):
+    """
+    write_log
+    """
+    global g_open_log
+    global g_current_time
+    if not g_open_log:
+        return
+    delt_time = time.time() - g_current_time if g_current_time is not None else 0
+    g_current_time = time.time()
+    prefix = '[log] [%s] [%.3f]' % (time.strftime("%Y-%m-%d %H:%M:%S"), delt_time)
+    coding = 'utf8'
+    if type(arg) == type((1, 2)):
+        arg = [v if v is not None else str(None) for v in arg]
+        arg = [arg if type(arg) not in set([type([]), type({})]) else json_2_str(arg)]
+        li = [elem.encode(coding, 'ignore') for elem in arg]
+        print >> sys.stderr, prefix, ' '.join(li)
+    else:
+        if arg is None:
+            arg = str(None)
+        print >> sys.stderr, prefix, arg.encode(coding, 'ignore')
+
+
 def str_2_json(uni):
     """
     unicode字符串转json 

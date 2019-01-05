@@ -13,6 +13,8 @@ import io
 from nn_NeuronNetwork import small_train, small_test 
 from cv2_common import collect_image_fea 
 from common import muti_process
+from common import log
+
 
 def split_data(data, T):
     from sklearn import datasets, cross_validation, metrics
@@ -58,15 +60,21 @@ def collect_train_data():
         np.savetxt('%s.val' % train_image_fpath, T, fmt="%d", delimiter=",")
 
     #data = data[:, 1600:]
-    #data = data[:, :1600]
+    data = data[:, :1600]
+    print data.shape, T.shape
+    data = data[range(0, data.shape[0], 3), :]
+    T = T[range(0, T.shape[0], 3), :]
+    print data.shape, T.shape
     X_train, T_train, X_validation, T_validation, X_test, T_test = split_data(data, T)
     return X_train, T_train, X_validation, T_validation, X_test, T_test 
 
 
 if __name__ == "__main__":
-    print '载入数据集...'
+    log(u'载入数据集...')
     X_train, T_train, X_validation, T_validation, X_test, T_test = collect_train_data()
-    print '训练数据集...'
-    small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, 150, 50, save_file='data/tmp.trademark_nn.txt')
-    print '预测...'
+    log(u'训练数据集...')
+    tag, num1 = 'nn', 150
+    tag, num1 = 'cnn', ((40, 40, 1), (3, 3, 1, 2), (2, 2), 2)
+    small_train(tag, X_train, T_train, X_validation, T_validation, X_test, T_test, num1, 50, save_file='data/tmp.trademark_nn.txt')
+    log(u'预测...')
     small_test('data/tmp.trademark_nn.txt', X_test, T_test)

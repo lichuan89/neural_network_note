@@ -17,7 +17,6 @@ import io
 import sys
 import copy
 import traceback
-import plt_common
 import common
 import img_common
 
@@ -100,6 +99,73 @@ def resize_image(image, width, height):
     return cv2.resize(image, dsize=(width, height), interpolation=cv2.INTER_AREA)
 
 
+def sobel_gray_image(img):
+    """ 
+    sobel_gray_image 
+    """
+    x = cv2.Sobel(img, cv2.CV_16S, 1, 0)  
+    y = cv2.Sobel(img, cv2.CV_16S, 0, 1)  
+  
+    absX = cv2.convertScaleAbs(x)   
+    absY = cv2.convertScaleAbs(y)  
+  
+    dst = cv2.addWeighted(absX, 0.5, absY, 0.5, 0)    
+    return dst
+
+
+
+def template_image(template, image, point=255):
+    """
+    对模版template上,灰度为point的点，在image上取0值 
+    """
+    for x in range(0, image.shape[0]):
+        for y in range(0, image.shape[1]):
+            if template[x][y] != point:
+                image[x][y] = 0
+            elif image[x][y] == 0:
+                image[x][y] = 1
+    points = np.array([
+            image[x][y] \
+            for x in range(image.shape[0]) \
+            for y in range(image.shape[1]) if template[x][y] == point
+        ])
+    return image, points
+
+
+def check_gray_muzzy(image, width):
+    try:
+        image = cv2.resize(image, (width, width * image.shape[0] / image.shape[1]))
+        laplacian_muzzy = cv2.Laplacian(image, cv2.CV_64F).var()
+
+        #image = cv2.blur(image, (3,3))
+        sobel_image = sobel_gray_image(image)
+        sobel_q = sobel_image.var()
+        
+        ret, otsu_image = cv2.threshold(sobel_image, 0, 255, cv2.THRESH_OTSU)
+    
+        kernel = np.ones((3, 3), np.uint8)
+        adjust_image = cv2.dilate(otsu_image, kernel, 1)
+        adjust_image = cv2.erode(adjust_image, kernel, 1)
+        kernel = np.ones((11, 11), np.uint8)
+        adjust_image = cv2.dilate(adjust_image, kernel, 1)
+       
+        sobel_sobel_image = sobel_gray_image(sobel_image)
+        target_image, points = template_image(adjust_image, sobel_sobel_image)
+        q = points.var()
+        check_image, _ = template_image(adjust_image, image)
+        cache = {
+                'sobel_image': sobel_image,
+                'otsu_image': otsu_image,
+                'sobel_sobel_image': sobel_sobel_image,
+                'adjust_image': adjust_image,
+                'target_image': target_image,
+                'check_image': check_image,
+            }
+        return q, cache
+    except IOError as error:
+        return None
+
+
 def random_expend_image(image):
     prob = random.random()
     a = max(0.3, prob * 2)
@@ -168,6 +234,7 @@ def collect_image_fea(files, expend_num=10, use_fea='pixel'):
         if g_open_debug:
             print >> sys.stderr, 'finish to process %s' % fname 
     if g_open_debug:
+        import plt_common
         plt_common.show_2d_images(mats[0: 50])
     return data, T 
 
@@ -206,5 +273,30 @@ def test_img_fea():
     #data, T = collect_image_fea(files, expend_num=2, use_fea='rgbhist')
     print data.shape, T.shape
 
+
+def test_muzzy():
+    image = file_2_cv2image('muzzy/1.jpg')
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    sobel_image = sobel_gray_image(image)
+    cv2image_2_file(sobel_image, 'test.bmp')
+    muzzy_q, cache = check_gray_muzzy(image, width=200)
+     
+
+def test_proces_dir(path):
+    arr = os.listdir(path)
+    for v in arr:
+        if v.find('.') == 0:
+            continue
+        f = '%s/%s' % (path, v)
+        if os.path.isfile(f):
+            image = file_2_cv2image(f)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            muzzy_q, cache = check_gray_muzzy(image, width=500)
+            for k, img in cache.items():  
+                cv2image_2_file(img, 'output/%s.%s.bmp' % (v, k))
+            print '%s\t%f' % (f, muzzy_q)
+            
+
+
 if __name__ == "__main__":
-    test_img_fea()
+    test_proces_dir('muzzy')

@@ -25,7 +25,11 @@ from nn_activation import arctan
 from nn_activation import arctan_deriv 
 from nn_activation import crossEntropy_cost
 from nn_activation import crossEntropy_cost_deriv 
-
+from cnn_common import conv
+from cnn_common import conv_gradient
+from cnn_common import maxpool
+from cnn_common import maxpool_gradient
+from common import log
 
 g_open_debug = False 
 
@@ -106,7 +110,7 @@ class LogisticLayer(Layer):
         return np.multiply(logistic_deriv(Y), output_grad)
 
     def to_string(self):
-        return 'LogisticLayer'
+        return ['LogisticLayer']
 
 class SoftmaxLayer(Layer):
     def get_output(self, X):
@@ -116,7 +120,7 @@ class SoftmaxLayer(Layer):
         return np.multiply(softmax_deriv(Y), output_grad)
    
     def to_string(self):
-        return 'SoftmaxLayer' 
+        return ['SoftmaxLayer']
 
 
 class ReluLayer(Layer):
@@ -127,8 +131,117 @@ class ReluLayer(Layer):
         return np.multiply(relu_deriv(Y), output_grad)
    
     def to_string(self):
-        return 'Relu' 
+        return ['Relu']
 
+
+
+class MaxpoolLayer(Layer):
+    def __init__(self, n_in=None, ksize=(2, 2), stride=2, args=None):
+        if args is not None:
+            self.from_string(args)
+            return
+        self.insize = n_in
+        self.ksize = ksize
+        self.stride = stride
+        self.mid = None
+
+    def get_output_size(self):
+        row, col, channel = self.insize
+        return int(math.ceil(1.0 * row / self.stride)), int(math.ceil(1.0 * col / self.stride)), channel
+ 
+    def get_output(self, X):
+        input_size = [X.shape[0]] + list(self.insize)
+        X = X.reshape(input_size)
+        y, self.mid = maxpool(X, self.ksize, self.stride)
+        y = y.reshape((y.shape[0], -1))
+        return y
+    
+    def get_input_grad(self, Y, output_grad):
+        output_size = [Y.shape[0]] + list(self.get_output_size())
+        output_grad = output_grad.reshape(output_size)
+        dX = maxpool_gradient(output_grad, self.mid, self.ksize, self.stride)
+        dX = dX.reshape(dX.shape[0], -1) 
+        return dX 
+   
+    def from_string(self, args):
+        self.insize, self.ksize, self.stride, _ = args
+        self.mid = None
+
+    def to_string(self):
+        return [
+            list(self.insize),
+            list(self.ksize),
+            self.stride,
+            'MaxpoolLayer' 
+        ]
+
+
+class ConvLayer(Layer):
+    """
+    卷积
+    """
+    
+    def __init__(self, n_in=None, ksize=None, ws_bs=None):
+        if ws_bs is not None:
+            self.from_string(ws_bs)
+            return
+        self.insize = n_in
+        self.ksize = ksize
+        row, col, channel = n_in
+        conv_row, conv_col, channel, conv_channel = ksize
+
+        weights_scale = math.sqrt(reduce(lambda x, y: x * y, n_in) / conv_channel)
+        self.W = np.random.standard_normal((conv_row, conv_col, channel, conv_channel)) / weights_scale
+        self.b = np.random.standard_normal(conv_channel) / weights_scale
+        if g_open_debug:
+            print >> sys.stderr, 'W.shape:%s, b.shape:%s' % (self.W.shape, self.b.shape) 
+
+
+    def get_params_iter(self):
+        return itertools.chain(np.nditer(self.W, op_flags=['readwrite']),
+                               np.nditer(self.b, op_flags=['readwrite']))
+    
+    def get_output(self, X):
+        input_size = [X.shape[0]] + list(self.insize)
+        X = X.reshape(input_size)
+        y, x_cols = conv(X, self.W, self.b, stride=1)
+        y = y.reshape((y.shape[0], -1))
+        self.mid = X
+        return y
+ 
+    def get_params_grad(self, X, output_grad):
+        input_size = [X.shape[0]] + list(self.insize)
+        X = X.reshape(input_size)
+        output_size = [output_grad.shape[0]] + list(self.insize[: 2]) + [self.ksize[-1]]
+        output_grad = output_grad.reshape(output_size)
+        Jparam, Jx = conv_gradient(X, output_grad, self.W, self.b, stride=1)
+        return Jparam    
+
+    def get_input_grad(self, Y, output_grad):
+        X = self.mid
+        input_size = [Y.shape[0]] + list(self.insize)
+        X = X.reshape(input_size)
+        output_size = [Y.shape[0]] + list(self.insize[: 2]) + [self.ksize[-1]]
+        output_grad = output_grad.reshape(output_size)
+        Jparam, Jx = conv_gradient(X, output_grad, self.W, self.b, stride=1)
+        Jx = Jx.reshape((Jx.shape[0], -1))
+        return Jx 
+
+    def from_string(self, ws_bs):
+        self.W = np.fromstring(base64.b64decode(ws_bs[0])).reshape(ws_bs[2])
+        self.b = np.fromstring(base64.b64decode(ws_bs[1])).reshape(ws_bs[3])
+        self.insize = ws_bs[4]
+        self.ksize = ws_bs[5]
+
+    def to_string(self):
+        return [
+                base64.b64encode(self.W.tostring()),
+                base64.b64encode(self.b.tostring()),
+                list(self.W.shape),
+                list(self.b.shape),
+                list(self.insize),
+                list(self.ksize)
+            ]
 
 def forward_step(input_samples, layers):
     """
@@ -137,9 +250,11 @@ def forward_step(input_samples, layers):
     activations = [input_samples] 
     X = input_samples
     for layer in layers:
+        log('begin to forward_step:', str(layer))
         Y = layer.get_output(X)  
         activations.append(Y)   
         X = activations[-1]  
+        log('finish to forward_step')
     return activations  
 
  
@@ -150,7 +265,8 @@ def backward_step(activations, targets, layers, cost_grad_func):
     """
     param_grads = collections.deque()  
     output_grad = None
-    for layer in reversed(layers):   
+    for layer in reversed(layers):
+        log('begin to backward_step:', str(layer))   
         Y = activations.pop()
         # 交叉熵损失函数, 合并链式梯度公式 
         if output_grad is None \
@@ -161,11 +277,12 @@ def backward_step(activations, targets, layers, cost_grad_func):
             if output_grad is None:
                 output_grad = cost_grad_func(Y, targets)  
             input_grad = layer.get_input_grad(Y, output_grad)
-
+        log('begin to calc cost') 
         X = activations[-1]
         grads = layer.get_params_grad(X, output_grad)
         param_grads.appendleft(grads)
         output_grad = input_grad
+        log('finish to backward_step')
     return list(param_grads)
 
 class NeuronNetwork(object):
@@ -184,15 +301,27 @@ class NeuronNetwork(object):
         # 构建神经网络
         self.layers = []
         for (neuron_num, active_func) in zip(layer_neuron_nums, layer_active_funcs):
-            # 构建每一层: 线性网络 + 激活函数
-            self.layers.append(LinearLayer(input_feature_num, neuron_num))
-            self.layers.append(active_func())
-            input_feature_num = neuron_num
+            if active_func == MaxpoolLayer:
+                # 构建卷积层: 卷积网络 + 池化
+                insize, ksize, poolsize, poolstride = neuron_num 
+                self.layers.append(ConvLayer(insize, ksize))
+                outsize = insize[0], insize[1], ksize[-1]
+                pooler = active_func(outsize ,poolsize, poolstride)
+                self.layers.append(pooler)
+                size = pooler.get_output_size()
+                input_feature_num = size[0] * size[1] * size[2] 
+                #row, col, channel = outsize
+                #input_feature_num = int(math.ceil(1.0 * row / poolstride)) * int(math.ceil(1.0 * col / poolstride)) * channel
+            else: 
+                # 构建每一层: 线性网络 + 激活函数
+                self.layers.append(LinearLayer(input_feature_num, neuron_num))
+                self.layers.append(active_func())
+                input_feature_num = neuron_num
         self.cost_func = cost_func
         self.cost_grad_func = cost_grad_func
    
     def from_string(self, string):
-        classes = [SoftmaxLayer, LogisticLayer, ReluLayer, crossEntropy_cost, crossEntropy_cost_deriv]
+        classes = [SoftmaxLayer, LogisticLayer, ReluLayer, MaxpoolLayer, crossEntropy_cost, crossEntropy_cost_deriv]
         classes = dict([active_func.__name__, active_func] for active_func in classes)
     
         self.layers = []
@@ -200,9 +329,15 @@ class NeuronNetwork(object):
         if objs is None:
             print >> sys.stderr, 'failed to load string'
             return False
-        for ws, bs, wi, bi, active_func_name in objs['layers']:
-            self.layers.append(LinearLayer(ws_bs=(ws, bs, wi, bi))) 
-            self.layers.append(classes[active_func_name]())
+        for layer_string in objs['layers']:
+            if layer_string[-1] == 'MaxpoolLayer':
+                ws, bs, wi, bi, insize, ksize, insize2, ksize2, stride2, active_func_name = layer_string
+                self.layers.append(ConvLayer(ws_bs=(ws, bs, wi, bi, insize, ksize)))
+                self.layers.append(classes[active_func_name](args=(insize2, ksize2, stride2, active_func_name)))
+            else:
+                ws, bs, wi, bi, active_func_name = layer_string
+                self.layers.append(LinearLayer(ws_bs=(ws, bs, wi, bi))) 
+                self.layers.append(classes[active_func_name]())
         self.cost_func = classes[objs['cost_func']]
         self.cost_grad_func = classes[objs['cost_grad_func']]
         return True
@@ -214,9 +349,15 @@ class NeuronNetwork(object):
             'cost_grad_func': self.cost_grad_func.__name__,
         } 
         for i in range(0, len(self.layers), 2):
-            ws, bs, wi, bi= self.layers[i].to_string()
             active_func_name = self.layers[i + 1].__class__.__name__
-            obj['layers'].append([ws, bs, wi, bi, active_func_name])
+            if active_func_name == 'MaxpoolLayer':
+                ws, bs, wi, bi, insize, ksize = self.layers[i].to_string()
+                insize2, ksize2, stride2, active = self.layers[i + 1].to_string()
+                obj['layers'].append([ws, bs, wi, bi, insize, ksize, insize2, ksize2, stride2, active])
+            else:
+                ws, bs, wi, bi= self.layers[i].to_string()
+                active, = self.layers[i + 1].to_string()
+                obj['layers'].append([ws, bs, wi, bi, active_func_name])
         return json_2_str(obj)
  
     def test_accuracy(self, X_test, T_test):
@@ -306,7 +447,7 @@ class NeuronNetwork(object):
             validation_costs.append(cost)
             print >> sys.stderr, 'train: validation cost is %f' % cost
             i += 1
-    
+   
             if len(validation_costs) > 3:
                 if validation_costs[-1] >= validation_costs[-2] >= validation_costs[-3]:
                     break
@@ -347,18 +488,27 @@ def collect_train_data():
     return X_train, T_train, X_validation, T_validation, X_test, T_test
 
 
-def small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, num1=20, num2=20, save_file=None):
+def small_train(tag, X_train, T_train, X_validation, T_validation, X_test, T_test, num1=20, num2=20, save_file=None):
     from plt_common import show_images, show_array, show_predict_numbers  
 
     # 构建神经网络
-    nn = NeuronNetwork(
-            X_train.shape[1], 
-            [num1, num2, T_train.shape[1]],
-            #[LogisticLayer, LogisticLayer, SoftmaxLayer],
-            [LogisticLayer, ReluLayer, SoftmaxLayer],
-            crossEntropy_cost,
-            crossEntropy_cost_deriv 
+    if tag == 'nn':
+        nn = NeuronNetwork(
+                X_train.shape[1], 
+                [num1, num2, T_train.shape[1]],
+                [LogisticLayer, LogisticLayer, SoftmaxLayer],
+                crossEntropy_cost,
+                crossEntropy_cost_deriv 
+            )
+    elif tag == 'cnn':
+        nn = NeuronNetwork(
+                X_train.shape[1], 
+                [num1, num2, T_train.shape[1]],
+                [MaxpoolLayer, LogisticLayer, SoftmaxLayer],
+                crossEntropy_cost,
+                crossEntropy_cost_deriv 
         )
+
     # 训练
     train_method = 'grad_desc'
     if train_method == 'random_grad_desc':
@@ -436,5 +586,18 @@ def test():
 if __name__ == "__main__": 
     # 准备数据集：训练, 校验, 测试 
     X_train, T_train, X_validation, T_validation, X_test, T_test = collect_train_data()
-    small_train(X_train, T_train, X_validation, T_validation, X_test, T_test, 20, 20, save_file='tmp.simple_nn.txt')
-    small_test('tmp.simple_nn.txt', X_test, T_test)
+    tag = 'nn'
+    tag = 'cnn'
+    select = 'predict'
+    select = 'train'
+
+    if select == 'train':
+        if tag == 'cnn':
+            tag = 'cnn'
+            num1 = ((8, 8, 1), (3, 3, 1, 2), (2, 2), 2)
+        if tag == 'nn':
+            tag = 'nn'
+            num1 = 20
+        small_train(tag, X_train, T_train, X_validation, T_validation, X_test, T_test, num1, 20, save_file='tmp.simple_nn.txt')
+    if select == 'predict':
+        small_test('tmp.simple_nn.txt', X_test, T_test)
